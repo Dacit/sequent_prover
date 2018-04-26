@@ -1,19 +1,4 @@
-#[derive(Debug)]
-pub enum Formula {
-    True,
-    False,
-    Atom(Box<str>),
-    Not(Box<Formula>),
-    Or(Box<Formula>, Box<Formula>),
-    And(Box<Formula>, Box<Formula>),
-    Implication(Box<Formula>, Box<Formula>),
-}
-
-#[derive(Debug)]
-pub struct Expression {
-    pub l: Vec<Formula>,
-    pub r: Vec<Formula>,
-}
+use super::dt::{Formula, Expression};
 
 /// Parse sequent formula in form "F1, ..., Fn => G1, ..., Gm" into an expression
 pub fn parse_expression(input: &str) -> Expression {
