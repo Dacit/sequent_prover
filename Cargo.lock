@@ -1,0 +1,4 @@
+[root]
+name = "sequent_prover"
+version = "0.1.0"
+
