@@ -1,4 +1,19 @@
-use super::dt::{Formula, Expression};
+#[derive(Debug)]
+pub enum Formula {
+    True,
+    False,
+    Atom(String),
+    Not(Box<Formula>),
+    Or(Box<Formula>, Box<Formula>),
+    And(Box<Formula>, Box<Formula>),
+    Implication(Box<Formula>, Box<Formula>),
+}
+
+#[derive(Debug)]
+pub struct Expression {
+    pub l: Vec<Formula>,
+    pub r: Vec<Formula>,
+}
 
 /// Parse sequent formula in form "F1, ..., Fn => G1, ..., Gm" into an expression
 pub fn parse_expression(input: &str) -> Expression {
@@ -36,7 +51,7 @@ fn parse_formula(input: &str) -> Formula {
             x if x.starts_with('-') => {
                 Formula::Not(Box::new(parse_formula(&x[1..])))
             }
-            x => Formula::Atom(String::from(x).into_boxed_str()),
+            x => Formula::Atom(String::from(x)),
         },
     }
 }

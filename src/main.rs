@@ -1,11 +1,10 @@
 mod parser;
 mod prover;
-mod dt;
 
 fn main() {
-    let formula = "F & G | C > D => G, -H";
+    let formula = "F, G>H => F";
     let expr = parser::parse_expression(&formula);
     println!("{:?}", &formula);
 
-    prover::proof(&expr);
+    println!("{:?}", prover::proof(&expr));
 }
