@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::clone::Clone;
 use super::parser::{Expression, Formula};
 
 #[derive(Debug)]
@@ -15,18 +15,30 @@ pub enum Rule {
 }
 
 #[derive(Debug)]
-pub struct ProofNode<'a> {
-    pub expr: &'a Expression,
+pub struct ProofNode {
+    pub expr: Box<Expression>,
     pub rule: Option<Rule>,
-    pub proof_by: Option<Vec<ProofNode<'a>>>,
+    pub proof_by: Option<Vec<Box<ProofNode>>>,
 }
 
-impl<'a> ProofNode<'a> {
-    pub fn new(e: &Expression) -> ProofNode {
+impl ProofNode {
+    pub fn new(e: Box<Expression>) -> ProofNode {
         ProofNode { expr: e, rule: None, proof_by: None }
     }
 
-    pub fn ax_rule(&mut self) -> Option<Vec<&mut ProofNode>> {
+    pub fn proof(&mut self) -> bool {
+        let rules = [ProofNode::ax_rule, ProofNode::l_not_rule];//, ProofNode::l_and_rule, ProofNode::r_not_rule, ProofNode::r_or_rule, ProofNode::r_impl_rule, ProofNode::l_or_rule, ProofNode::l_impl_rule, ProofNode::r_and_rule];
+
+        for rule in rules.iter() {
+            if rule(self) {
+                return (&mut self.proof_by.as_mut().unwrap()).iter_mut().map(|x|(*x).proof()).fold(true, |f,g|f && g )
+            }
+        }
+
+        false
+    }
+
+    pub fn ax_rule(&mut self) -> bool {
         let left_atoms: Vec<String> = self.expr.l.iter()
             .filter_map(|f| match f {
                 &Formula::Atom(ref a) => Some(a.clone()),
@@ -39,77 +51,46 @@ impl<'a> ProofNode<'a> {
         }) {
             self.rule = Some(Rule::Ax);
             self.proof_by = Some(vec![]);
-            Some(vec![])
+            true
         } else {
-            None
+            false
         }
     }
 
-    pub fn l_not_rule(&mut self) -> Option<Vec<&mut ProofNode>> {
-        unimplemented!()
-    }
-    pub fn l_and_rule(&mut self) -> Option<Vec<&mut ProofNode>> {
-        unimplemented!()
-    }
-    pub fn l_or_rule(&mut self) -> Option<Vec<&mut ProofNode>> {
-        unimplemented!()
-    }
-    pub fn l_impl_rule(&mut self) -> Option<Vec<&mut ProofNode>> {
-        unimplemented!()
-    }
-    pub fn r_not_rule(&mut self) -> Option<Vec<&mut ProofNode>> { unimplemented!() }
-    pub fn r_and_rule(&mut self) -> Option<Vec<&mut ProofNode>> {
-        unimplemented!()
-    }
-    pub fn r_or_rule(&mut self) -> Option<Vec<&mut ProofNode>> {
-        unimplemented!()
-    }
-    pub fn r_impl_rule(&mut self) -> Option<Vec<&mut ProofNode>> {
-        unimplemented!()
-    }
-}
+    pub fn l_not_rule(&mut self) -> bool {
+        match self.expr.l.iter().enumerate().find(|&(i, f)| match f {
+            &Formula::Not(_) => true,
+            _ => false
+        }) {
+            Some((i, &Formula::Not(ref g))) => {
+                let mut expr = self.expr.clone();
+                expr.l.remove(i);
+                expr.r.insert(0, *g.clone());
 
-/*pub fn proof2(expr: &Expression) -> ProofNode {
-    let mut proof_tree = ProofNode::new(&expr);
-    let using_rules = [ProofNode::ax_rule];
-    {
-        let mut unproved_nodes = &vec![&mut proof_tree];
-
-        while !unproved_nodes.is_empty() {
-            let nodes = *unproved_nodes.into_iter();
-            unproved_nodes = &vec![];
-
-            'nodes: for node in nodes {
-                for rule in using_rules.iter() {
-                    let res = rule(node);
-                    if res.is_some() {
-                        *unproved_nodes.append(&mut res.unwrap());
-                        continue 'nodes;
-                    }
-                }
-                panic!("Could not prove");
-            }
+                self.rule = Some(Rule::LNot);
+                self.proof_by = Some(vec![Box::from(ProofNode::new(expr))]);
+                return true
+            },
+            _ => false,
         }
     }
-    proof_tree
-}*/
-
-pub fn proof(expr: &Expression) -> (bool, ProofNode) {
-    let mut root = ProofNode::new(&expr);
-
-    let is_valid = proof_tree(&mut root);
-
-    (is_valid, root)
-}
-
-fn proof_tree(node: &mut ProofNode) -> bool {
-    let RULES = [ProofNode::ax_rule, ProofNode::l_not_rule, ProofNode::l_and_rule, ProofNode::r_not_rule, ProofNode::r_or_rule, ProofNode::r_impl_rule, ProofNode::l_or_rule, ProofNode::l_impl_rule, ProofNode::r_and_rule];
-
-    for rule in RULES.iter() {
-        let res = rule(node);
-        if res.is_some() {
-            return res.unwrap().into_iter().map(|n| proof_tree(n)).fold(true, |f, g| f && g);
-        }
+    pub fn l_and_rule(&mut self) -> bool {
+        unimplemented!()
     }
-    false
+    pub fn l_or_rule(&mut self) -> bool {
+        unimplemented!()
+    }
+    pub fn l_impl_rule(&mut self) -> bool {
+        unimplemented!()
+    }
+    pub fn r_not_rule(&mut self) -> bool { unimplemented!() }
+    pub fn r_and_rule(&mut self) -> bool {
+        unimplemented!()
+    }
+    pub fn r_or_rule(&mut self) -> bool {
+        unimplemented!()
+    }
+    pub fn r_impl_rule(&mut self) -> bool {
+        unimplemented!()
+    }
 }

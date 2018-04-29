@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Formula {
     True,
     False,
@@ -9,7 +9,7 @@ pub enum Formula {
     Implication(Box<Formula>, Box<Formula>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Expression {
     pub l: Vec<Formula>,
     pub r: Vec<Formula>,
@@ -28,7 +28,11 @@ pub fn parse_expression(input: &str) -> Expression {
 
 /// Parse "F1, ..., Fn" into a vector of formulas
 fn parse_formulas(input: &str) -> Vec<Formula> {
-    input.split(",").map(parse_formula).collect()
+    if input.is_empty(){
+        vec![]
+    } else {
+        input.split(",").map(parse_formula).collect()
+    }
 }
 
 fn split_expr(x: &str, pos: usize, op: &Fn(Box<Formula>, Box<Formula>) -> Formula) -> Formula {
