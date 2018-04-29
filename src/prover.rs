@@ -27,18 +27,19 @@ impl ProofNode {
     }
 
     pub fn proof(&mut self) -> bool {
-        let rules = [ProofNode::ax_rule, ProofNode::l_not_rule];//, ProofNode::l_and_rule, ProofNode::r_not_rule, ProofNode::r_or_rule, ProofNode::r_impl_rule, ProofNode::l_or_rule, ProofNode::l_impl_rule, ProofNode::r_and_rule];
+        let rules = [ProofNode::ax_rule, ProofNode::l_not_rule, ProofNode::l_and_rule, ProofNode::r_not_rule, ProofNode::r_or_rule, ProofNode::r_impl_rule, ProofNode::l_or_rule, ProofNode::l_impl_rule, ProofNode::r_and_rule];
 
         for rule in rules.iter() {
             if rule(self) {
-                return (&mut self.proof_by.as_mut().unwrap()).iter_mut().map(|x|(*x).proof()).fold(true, |f,g|f && g )
+                return (&mut self.proof_by.as_mut().unwrap()).iter_mut()
+                    .map(|x| (*x).proof()).fold(true, |f, g| f && g);
             }
         }
 
         false
     }
 
-    pub fn ax_rule(&mut self) -> bool {
+    fn ax_rule(&mut self) -> bool {
         let left_atoms: Vec<String> = self.expr.l.iter()
             .filter_map(|f| match f {
                 &Formula::Atom(ref a) => Some(a.clone()),
@@ -57,40 +58,148 @@ impl ProofNode {
         }
     }
 
-    pub fn l_not_rule(&mut self) -> bool {
-        match self.expr.l.iter().enumerate().find(|&(i, f)| match f {
-            &Formula::Not(_) => true,
+    fn find_formula(fs: &Vec<Formula>, rule: Rule) -> Option<(usize, &Formula)> {
+        (*fs).iter().enumerate().find(|&(_, f)| match (f, &rule) {
+            (&Formula::Not(_), &Rule::LNot) | (&Formula::Not(_), &Rule::RNot) => true,
+            (&Formula::And(_, _), &Rule::LAnd) | (&Formula::And(_, _), &Rule::RAnd) => true,
+            (&Formula::Or(_, _), &Rule::LOr) | (&Formula::Or(_, _), &Rule::ROr) => true,
+            (&Formula::Implication(_, _), &Rule::LImpl) | (&Formula::Implication(_, _), &Rule::RImpl) => true,
             _ => false
-        }) {
+        })
+    }
+
+    fn l_not_rule(&mut self) -> bool {
+        match ProofNode::find_formula(&self.expr.l, Rule::LNot) {
             Some((i, &Formula::Not(ref g))) => {
                 let mut expr = self.expr.clone();
                 expr.l.remove(i);
-                expr.r.insert(0, *g.clone());
+                expr.r.push(*g.clone());
 
                 self.rule = Some(Rule::LNot);
                 self.proof_by = Some(vec![Box::from(ProofNode::new(expr))]);
-                return true
-            },
+                true
+            }
             _ => false,
         }
     }
-    pub fn l_and_rule(&mut self) -> bool {
-        unimplemented!()
+
+    fn l_and_rule(&mut self) -> bool {
+        match ProofNode::find_formula(&self.expr.l, Rule::LAnd) {
+            Some((i, &Formula::And(ref f, ref g))) => {
+                let mut expr = self.expr.clone();
+                expr.l.remove(i);
+                expr.l.push(*f.clone());
+                expr.l.push(*g.clone());
+
+                self.rule = Some(Rule::LAnd);
+                self.proof_by = Some(vec![Box::from(ProofNode::new(expr))]);
+                true
+            }
+            _ => false,
+        }
     }
-    pub fn l_or_rule(&mut self) -> bool {
-        unimplemented!()
+
+    fn l_or_rule(&mut self) -> bool {
+        match ProofNode::find_formula(&self.expr.l, Rule::LOr) {
+            Some((i, &Formula::Or(ref f, ref g))) => {
+                let mut expr1 = self.expr.clone();
+                expr1.l.remove(i);
+
+                let mut expr2 = expr1.clone();
+                expr1.l.push(*f.clone());
+                expr2.l.push(*g.clone());
+
+                self.rule = Some(Rule::LOr);
+                self.proof_by = Some(vec![Box::from(ProofNode::new(expr1)),
+                                          Box::from(ProofNode::new(expr2))]);
+                true
+            }
+            _ => false,
+        }
     }
-    pub fn l_impl_rule(&mut self) -> bool {
-        unimplemented!()
+
+    fn l_impl_rule(&mut self) -> bool {
+        match ProofNode::find_formula(&self.expr.l, Rule::LImpl) {
+            Some((i, &Formula::Implication(ref f, ref g))) => {
+                let mut expr1 = self.expr.clone();
+                expr1.l.remove(i);
+
+                let mut expr2 = expr1.clone();
+                expr1.r.push(*f.clone());
+                expr2.l.push(*g.clone());
+
+                self.rule = Some(Rule::LImpl);
+                self.proof_by = Some(vec![Box::from(ProofNode::new(expr1)),
+                                          Box::from(ProofNode::new(expr2))]);
+                true
+            }
+            _ => false,
+        }
     }
-    pub fn r_not_rule(&mut self) -> bool { unimplemented!() }
-    pub fn r_and_rule(&mut self) -> bool {
-        unimplemented!()
+
+    fn r_not_rule(&mut self) -> bool {
+        match ProofNode::find_formula(&self.expr.r, Rule::RNot) {
+            Some((i, &Formula::Not(ref f))) => {
+                let mut expr = self.expr.clone();
+                expr.r.remove(i);
+                expr.l.push(*f.clone());
+
+                self.rule = Some(Rule::RNot);
+                self.proof_by = Some(vec![Box::from(ProofNode::new(expr))]);
+                true
+            }
+            _ => false,
+        }
     }
-    pub fn r_or_rule(&mut self) -> bool {
-        unimplemented!()
+
+    fn r_and_rule(&mut self) -> bool {
+        match ProofNode::find_formula(&self.expr.r, Rule::RAnd) {
+            Some((i, &Formula::And(ref f, ref g))) => {
+                let mut expr1 = self.expr.clone();
+                expr1.r.remove(i);
+
+                let mut expr2 = expr1.clone();
+                expr1.r.push(*f.clone());
+                expr2.r.push(*g.clone());
+
+                self.rule = Some(Rule::RAnd);
+                self.proof_by = Some(vec![Box::from(ProofNode::new(expr1)),
+                                          Box::from(ProofNode::new(expr2))]);
+                true
+            }
+            _ => false,
+        }
     }
-    pub fn r_impl_rule(&mut self) -> bool {
-        unimplemented!()
+
+    fn r_or_rule(&mut self) -> bool {
+        match ProofNode::find_formula(&self.expr.r, Rule::ROr) {
+            Some((i, &Formula::Or(ref f, ref g))) => {
+                let mut expr = self.expr.clone();
+                expr.r.remove(i);
+                expr.r.push(*f.clone());
+                expr.r.push(*g.clone());
+
+                self.rule = Some(Rule::ROr);
+                self.proof_by = Some(vec![Box::from(ProofNode::new(expr))]);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn r_impl_rule(&mut self) -> bool {
+        match ProofNode::find_formula(&self.expr.r, Rule::RImpl) {
+            Some((i, &Formula::Implication(ref f, ref g))) => {
+                let mut expr = self.expr.clone();
+                expr.r.remove(i);
+                expr.l.push(*f.clone());
+                expr.r.push(*g.clone());
+
+                self.rule = Some(Rule::RImpl);
+                self.proof_by = Some(vec![Box::from(ProofNode::new(expr))]);
+                true
+            }
+            _ => false,
+        }
     }
 }

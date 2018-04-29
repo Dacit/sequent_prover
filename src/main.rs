@@ -2,7 +2,7 @@ mod parser;
 mod prover;
 
 fn main() {
-    let formula = "-F, F =>";
+    let formula = "-F, G & F =>";
     let expr = parser::parse_expression(&formula);
     println!("{:?}", &formula);
 
