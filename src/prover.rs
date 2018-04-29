@@ -1,9 +1,10 @@
 use std::clone::Clone;
 use super::parser::{Expression, Formula};
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum Rule {
     Ax,
+    LFalse,
     LNot,
     LAnd,
     LOr,
@@ -14,25 +15,29 @@ pub enum Rule {
     RImpl,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct ProofNode {
-    pub expr: Box<Expression>,
+    pub expr: Expression,
     pub rule: Option<Rule>,
     pub proof_by: Option<Vec<Box<ProofNode>>>,
 }
 
 impl ProofNode {
-    pub fn new(e: Box<Expression>) -> ProofNode {
+    fn new(e: Expression) -> ProofNode {
         ProofNode { expr: e, rule: None, proof_by: None }
     }
 
-    pub fn proof(&mut self) -> bool {
-        let rules = [ProofNode::ax_rule, ProofNode::l_not_rule, ProofNode::l_and_rule, ProofNode::r_not_rule, ProofNode::r_or_rule, ProofNode::r_impl_rule, ProofNode::l_or_rule, ProofNode::l_impl_rule, ProofNode::r_and_rule];
+    fn prove(&mut self) -> bool {
+        let rules = [ProofNode::ax_rule, ProofNode::l_false_rule,
+            ProofNode::l_not_rule, ProofNode::l_and_rule, ProofNode::r_not_rule,
+            ProofNode::r_or_rule, ProofNode::r_impl_rule, ProofNode::l_or_rule,
+            ProofNode::l_impl_rule, ProofNode::r_and_rule];
 
         for rule in rules.iter() {
             if rule(self) {
                 return (&mut self.proof_by.as_mut().unwrap()).iter_mut()
-                    .map(|x| (*x).proof()).fold(true, |f, g| f && g);
+                    .map(|x| (*x).prove())
+                    .fold(true, |f, g| f && g);
             }
         }
 
@@ -60,12 +65,28 @@ impl ProofNode {
 
     fn find_formula(fs: &Vec<Formula>, rule: Rule) -> Option<(usize, &Formula)> {
         (*fs).iter().enumerate().find(|&(_, f)| match (f, &rule) {
-            (&Formula::Not(_), &Rule::LNot) | (&Formula::Not(_), &Rule::RNot) => true,
-            (&Formula::And(_, _), &Rule::LAnd) | (&Formula::And(_, _), &Rule::RAnd) => true,
-            (&Formula::Or(_, _), &Rule::LOr) | (&Formula::Or(_, _), &Rule::ROr) => true,
-            (&Formula::Implication(_, _), &Rule::LImpl) | (&Formula::Implication(_, _), &Rule::RImpl) => true,
+            (&Formula::False, &Rule::LFalse)
+            | (&Formula::Not(_), &Rule::LNot)
+            | (&Formula::Not(_), &Rule::RNot)
+            | (&Formula::And(_, _), &Rule::LAnd)
+            | (&Formula::And(_, _), &Rule::RAnd)
+            | (&Formula::Or(_, _), &Rule::LOr)
+            | (&Formula::Or(_, _), &Rule::ROr)
+            | (&Formula::Implication(_, _), &Rule::LImpl)
+            | (&Formula::Implication(_, _), &Rule::RImpl) => true,
             _ => false
         })
+    }
+
+    fn l_false_rule(&mut self) -> bool {
+        match ProofNode::find_formula(&self.expr.l, Rule::LFalse) {
+            Some((i, &Formula::False)) => {
+                self.rule = Some(Rule::LFalse);
+                self.proof_by = Some(vec![]);
+                true
+            }
+            _ => false,
+        }
     }
 
     fn l_not_rule(&mut self) -> bool {
@@ -201,5 +222,66 @@ impl ProofNode {
             }
             _ => false,
         }
+    }
+}
+
+pub fn prove(expr: Expression) -> (bool, Box<ProofNode>) {
+    let mut root = Box::from(ProofNode::new(expr));
+
+    (root.prove(), root)
+}
+
+#[cfg(test)]
+mod tests {
+    use prover::*;
+    use parser::*;
+
+    #[test]
+    fn test_empty_expr() {
+        let (proven, _) = prove(parse_expression("=>"));
+        assert_eq!(false, proven);
+    }
+
+    #[test]
+    fn test_axiom() {
+        let expr = parse_expression("A, T => A, D");
+        let (proven, proof_tree) = prove(expr.clone());
+
+        assert_eq!(true, proven);
+        assert_eq!(Box::from(ProofNode {
+            expr: expr,
+            rule: Some(Rule::Ax),
+            proof_by: Some(vec![]),
+        }), proof_tree);
+    }
+
+    #[test]
+    fn test_l_false() {
+        let expr = parse_expression("0, T => D");
+        let (proven, proof_tree) = prove(expr.clone());
+
+        assert_eq!(true, proven);
+        assert_eq!(Box::from(ProofNode {
+            expr: expr,
+            rule: Some(Rule::LFalse),
+            proof_by: Some(vec![]),
+        }), proof_tree);
+    }
+
+    #[test]
+    fn test_l_not() {
+        let expr = parse_expression("-A, A, T => D");
+        let (proven, proof_tree) = prove(expr.clone());
+
+        assert_eq!(true, proven);
+        assert_eq!(Box::from(ProofNode {
+            expr: expr,
+            rule: Some(Rule::LNot),
+            proof_by: Some(vec![Box::from(ProofNode {
+                expr: parse_expression("A, T => D, A"),
+                rule: Some(Rule::Ax),
+                proof_by: Some(vec![]),
+            })]),
+        }), proof_tree);
     }
 }

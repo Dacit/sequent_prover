@@ -20,12 +20,12 @@ fn main() {
         let expr = parser::parse_expression(expression.as_str());
         println!("Parsed expression: {:?}", &expr);
 
-        let mut root = prover::ProofNode::new(Box::from(expr));
+        let (proven, proof_tree) = prover::prove(expr);
 
-        if root.proof() {
-            println!("Statement is valid. Proof tree: {:?}", root);
+        if proven {
+            println!("Statement is valid. Proof tree: {:?}", proof_tree);
         } else {
-            println!("Not provable. Partial proof tree: {:?}", root);
+            println!("Not provable. Partial proof tree: {:?}", proof_tree);
         }
     }
 }

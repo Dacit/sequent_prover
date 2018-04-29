@@ -1,4 +1,4 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Formula {
     True,
     False,
@@ -9,7 +9,7 @@ pub enum Formula {
     Implication(Box<Formula>, Box<Formula>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Expression {
     pub l: Vec<Formula>,
     pub r: Vec<Formula>,
@@ -17,7 +17,7 @@ pub struct Expression {
 
 /// Parse sequent formula in form "F1, ..., Fn => G1, ..., Gm" into an expression
 pub fn parse_expression(input: &str) -> Expression {
-    let split: Vec<&str> = input.split("=>").collect();
+    let split: Vec<&str> = input.trim_matches(' ').split("=>").collect();
 
     if split.len() != 2 {
         panic!("Not in sequent form");
@@ -28,7 +28,7 @@ pub fn parse_expression(input: &str) -> Expression {
 
 /// Parse "F1, ..., Fn" into a vector of formulas
 fn parse_formulas(input: &str) -> Vec<Formula> {
-    if input.is_empty(){
+    if input.is_empty() {
         vec![]
     } else {
         input.split(",").map(parse_formula).collect()
@@ -57,5 +57,45 @@ fn parse_formula(input: &str) -> Formula {
             }
             x => Formula::Atom(String::from(x)),
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use parser::*;
+    use parser::Formula::*;
+
+    #[test]
+    #[should_panic]
+    fn test_empty_str() {
+        parse_expression(" ");
+    }
+
+    #[test]
+    fn test_empty_sets() {
+        let res = parse_expression(" => ");
+        assert_eq!(Expression { l: vec![], r: vec![] }, res);
+    }
+
+    #[test]
+    fn test_complex_expr() {
+        let expr_str = "0 | -B & C >1 =>D > F> G";
+        let expr = Expression {
+            l: vec![Implication(
+                Box::from(Or(
+                    Box::from(False),
+                    Box::from(And(
+                        Box::from(Not(
+                            Box::from(Atom(String::from("B"))))),
+                        Box::from(Atom(String::from("C"))))))),
+                Box::from(True))],
+            r: vec![Implication(Box::from(Atom(String::from("D"))),
+                                Box::from(Implication(
+                                    Box::from(Atom(String::from("F"))),
+                                    Box::from(Atom(String::from("G"))))))],
+        };
+
+        let res = parse_expression(expr_str);
+        assert_eq!(expr, res);
     }
 }
