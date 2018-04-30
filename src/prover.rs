@@ -80,7 +80,7 @@ impl ProofNode {
 
     fn l_false_rule(&mut self) -> bool {
         match ProofNode::find_formula(&self.expr.l, Rule::LFalse) {
-            Some((i, &Formula::False)) => {
+            Some((_, &Formula::False)) => {
                 self.rule = Some(Rule::LFalse);
                 self.proof_by = Some(vec![]);
                 true
@@ -239,7 +239,26 @@ mod tests {
     #[test]
     fn test_empty_expr() {
         let (proven, _) = prove(parse_expression("=>"));
-        assert_eq!(false, proven);
+        assert!(!proven);
+    }
+
+    #[test]
+    fn test_complex_unprovable() {
+        let (proven, _) = prove(parse_expression(" => P & Q | R & Q | -P & -R | R & -R > P | Q"));
+        assert!(!proven);
+    }
+
+    #[test]
+    fn test_complex() {
+        let (proven, proof_tree) =
+            prove(parse_expression(" => P & Q | R & Q | P & -R | R & -R > P | Q"));
+        assert!(proven);
+        //Assert that proof tree is complex - 5 layers min.
+        assert!(proof_tree.proof_by.unwrap().remove(0)
+            .proof_by.unwrap().remove(0)
+            .proof_by.unwrap().remove(0)
+            .proof_by.unwrap().remove(0)
+            .proof_by.is_some());
     }
 
     #[test]
@@ -247,7 +266,7 @@ mod tests {
         let expr = parse_expression("A, T => A, D");
         let (proven, proof_tree) = prove(expr.clone());
 
-        assert_eq!(true, proven);
+        assert!(proven);
         assert_eq!(Box::from(ProofNode {
             expr: expr,
             rule: Some(Rule::Ax),
@@ -260,7 +279,7 @@ mod tests {
         let expr = parse_expression("0, T => D");
         let (proven, proof_tree) = prove(expr.clone());
 
-        assert_eq!(true, proven);
+        assert!(proven);
         assert_eq!(Box::from(ProofNode {
             expr: expr,
             rule: Some(Rule::LFalse),
@@ -270,15 +289,146 @@ mod tests {
 
     #[test]
     fn test_l_not() {
-        let expr = parse_expression("-A, A, T => D");
+        let expr = parse_expression("-F, F, T => D");
         let (proven, proof_tree) = prove(expr.clone());
 
-        assert_eq!(true, proven);
+        assert!(proven);
         assert_eq!(Box::from(ProofNode {
             expr: expr,
             rule: Some(Rule::LNot),
             proof_by: Some(vec![Box::from(ProofNode {
-                expr: parse_expression("A, T => D, A"),
+                expr: parse_expression("F, T => D, F"),
+                rule: Some(Rule::Ax),
+                proof_by: Some(vec![]),
+            })]),
+        }), proof_tree);
+    }
+
+    #[test]
+    fn test_l_or() {
+        let expr = parse_expression("F | G, T => F, G, D");
+        let (proven, proof_tree) = prove(expr.clone());
+
+        assert!(proven);
+        assert_eq!(Box::from(ProofNode {
+            expr: expr,
+            rule: Some(Rule::LOr),
+            proof_by: Some(vec![Box::from(ProofNode {
+                expr: parse_expression("T, F => F, G, D"),
+                rule: Some(Rule::Ax),
+                proof_by: Some(vec![])
+            }), Box::from(ProofNode {
+                expr: parse_expression("T, G => F, G, D"),
+                rule: Some(Rule::Ax),
+                proof_by: Some(vec![]),
+            })]),
+        }), proof_tree);
+    }
+
+    #[test]
+    fn test_l_and() {
+        let expr = parse_expression("F & G, T => F");
+        let (proven, proof_tree) = prove(expr.clone());
+
+        assert!(proven);
+        assert_eq!(Box::from(ProofNode {
+            expr: expr,
+            rule: Some(Rule::LAnd),
+            proof_by: Some(vec![Box::from(ProofNode {
+                expr: parse_expression("T, F, G => F"),
+                rule: Some(Rule::Ax),
+                proof_by: Some(vec![]),
+            })])
+        }), proof_tree);
+    }
+
+    #[test]
+    fn test_l_impl() {
+        let expr = parse_expression("F > G, F, T => G, D");
+        let (proven, proof_tree) = prove(expr.clone());
+
+        assert!(proven);
+        assert_eq!(Box::from(ProofNode {
+            expr: expr,
+            rule: Some(Rule::LImpl),
+            proof_by: Some(vec![Box::from(ProofNode {
+                expr: parse_expression("F, T => G, D, F"),
+                rule: Some(Rule::Ax),
+                proof_by: Some(vec![]),
+            }), Box::from(ProofNode {
+                expr: parse_expression("F, T, G => G, D"),
+                rule: Some(Rule::Ax),
+                proof_by: Some(vec![]),
+            })])
+        }), proof_tree);
+    }
+
+    #[test]
+    fn test_r_not() {
+        let expr = parse_expression("T => -F, F, D");
+        let (proven, proof_tree) = prove(expr.clone());
+
+        assert!(proven);
+        assert_eq!(Box::from(ProofNode {
+            expr: expr,
+            rule: Some(Rule::RNot),
+            proof_by: Some(vec![Box::from(ProofNode {
+                expr: parse_expression("T, F => F, D"),
+                rule: Some(Rule::Ax),
+                proof_by: Some(vec![]),
+            })])
+        }), proof_tree);
+    }
+
+    #[test]
+    fn test_r_or() {
+        let expr = parse_expression("F, T => F | G, D");
+        let (proven, proof_tree) = prove(expr.clone());
+
+        assert!(proven);
+        assert_eq!(Box::from(ProofNode {
+            expr: expr,
+            rule: Some(Rule::ROr),
+            proof_by: Some(vec![Box::from(ProofNode {
+                expr: parse_expression("F, T => D, F, G"),
+                rule: Some(Rule::Ax),
+                proof_by: Some(vec![]),
+            })]),
+        }), proof_tree);
+    }
+
+    #[test]
+    fn test_r_and() {
+        let expr = parse_expression("F, G, T => F & G, D");
+        let (proven, proof_tree) = prove(expr.clone());
+
+        assert!(proven);
+        assert_eq!(Box::from(ProofNode {
+            expr: expr,
+            rule: Some(Rule::RAnd),
+            proof_by: Some(vec![Box::from(ProofNode {
+                expr: parse_expression("F, G, T => D, F"),
+                rule: Some(Rule::Ax),
+                proof_by: Some(vec![]),
+            }), Box::from(ProofNode {
+                expr: parse_expression("F, G, T => D, G"),
+                rule: Some(Rule::Ax),
+                proof_by: Some(vec![]),
+            })]),
+        }), proof_tree);
+    }
+
+    #[test]
+    fn test_r_impl() {
+        let expr = parse_expression("G, T => F > G, F, D");
+        let (proven, proof_tree) = prove(expr.clone());
+
+        assert!(proven);
+        assert_eq!(Box::from(ProofNode {
+            expr: expr,
+            rule: Some(Rule::RImpl),
+            proof_by: Some(vec![Box::from(ProofNode {
+                expr: parse_expression("G, T, F => F, D, G"),
                 rule: Some(Rule::Ax),
                 proof_by: Some(vec![]),
             })]),
