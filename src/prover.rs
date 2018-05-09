@@ -1,5 +1,7 @@
 use super::parser::{Expression, Formula};
+use itertools::Itertools;
 use std::clone::Clone;
+use std::cmp;
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum Rule {
@@ -13,6 +15,23 @@ pub enum Rule {
     RAnd,
     ROr,
     RImpl,
+}
+
+impl Rule {
+    pub fn to_string(&self) -> String {
+        String::from(match self {
+            &Rule::Ax => "Ax",
+            &Rule::LFalse => "0L",
+            &Rule::LNot => "-L",
+            &Rule::LAnd => "&L",
+            &Rule::LOr => "|L",
+            &Rule::LImpl => ">L",
+            &Rule::RNot => "-R",
+            &Rule::RAnd => "&R",
+            &Rule::ROr => "|R",
+            &Rule::RImpl => ">R",
+        })
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -54,6 +73,73 @@ impl ProofNode {
         }
     }
 
+    pub fn build_str(&self) -> (usize, usize, Vec<String>) {
+        let mut lower = self.expr.to_string();
+
+        match self.proof_by.as_ref() {
+            Some(&Proof {
+                ref rule,
+                ref leaves,
+            }) => {
+                // find out length of next line
+                let mut upper_lines: Vec<(usize, usize, Vec<String>)> =
+                    leaves.iter().map(ProofNode::build_str).collect();
+
+                let upper_len = upper_lines
+                    .iter()
+                    .map(|&(_, size, _)| size)
+                    .fold1(|s1, s2| s1 + 6 + s2)
+                    .unwrap_or(0);
+
+                let mid = " ".repeat((&rule).to_string().len()).to_string() + &" "
+                    + &if lower.len() >= upper_len {
+                        "-".repeat(lower.len()) + &" " + &rule.to_string()
+                    } else {
+                        let diff = |e: Option<&(usize, usize, Vec<String>)>| {
+                            e.and_then(|&(size, _, ref vec)| {
+                                vec.last().and_then(|s| Some((s.len() - 6 - size) / 2))
+                            }).unwrap_or(0)
+                        };
+                        let (before, after) = (diff(upper_lines.first()), diff(upper_lines.last()));
+                        " ".repeat(before).to_string() + &"-".repeat(upper_len - (before + after)) + &" "
+                            + &rule.to_string() + &" ".repeat(after)
+                    };
+
+                // center the lower line to sperator length
+                let lower_uncentered_len = lower.len();
+                lower = center(mid.len(), lower);
+
+                let mut joined_lines: Vec<String> = vec![];
+
+                // do a pass for each output line, joining the proof_by strings
+                let max_depth = upper_lines
+                    .iter()
+                    .map(|&(_, _, ref vec)| vec.len())
+                    .max()
+                    .unwrap_or(0);
+
+                for _ in 0..max_depth {
+                    let line = upper_lines
+                        .iter_mut()
+                        .map(|&mut (len, _, ref mut vec)| {
+                            vec.pop().unwrap_or(" ".repeat(len + 6).to_string())
+                        })
+                        .fold1(|s1, s2| s1 + &s2)
+                        .unwrap_or("".to_string());
+
+                    joined_lines.insert(0, center(mid.len(), line));
+                }
+                // add own lines
+
+                joined_lines.push(mid);
+                joined_lines.push(lower);
+
+                (lower_uncentered_len, cmp::max(lower_uncentered_len, upper_len), joined_lines)
+            }
+            _ => (lower.len(), lower.len(), vec![lower]),
+        }
+    }
+
     /// Builds proof tree starting at self, returns if all leaves could be proven
     pub fn prove(&mut self) -> bool {
         self.proof_by = RULES.iter().filter_map(|rule| rule(self)).nth(0);
@@ -71,7 +157,9 @@ impl ProofNode {
     }
 
     fn destruct_formula<F>(fs: &[Formula], rule: F) -> Option<Proof>
-        where F: Fn(usize, &Formula) -> Option<Proof> {
+    where
+        F: Fn(usize, &Formula) -> Option<Proof>,
+    {
         fs.iter()
             .enumerate()
             .filter_map(|(i, fs)| rule(i, fs))
@@ -106,7 +194,7 @@ impl ProofNode {
             &Formula::Not(ref f) => {
                 let mut expr = self.expr.clone();
                 expr.l.remove(i);
-                expr.r.push(f.as_ref().clone());
+                expr.r.insert(0, f.as_ref().clone());
 
                 Some(Proof::new(Rule::LNot, vec![ProofNode::new(expr)]))
             }
@@ -119,12 +207,12 @@ impl ProofNode {
             &Formula::And(ref f, ref g) => {
                 let mut expr = self.expr.clone();
                 expr.l.remove(i);
-                expr.l.push(f.as_ref().clone());
-                expr.l.push(g.as_ref().clone());
+                expr.l.insert(i, f.as_ref().clone());
+                expr.l.insert(i + 1, g.as_ref().clone());
 
                 Some(Proof::new(Rule::LAnd, vec![ProofNode::new(expr)]))
             }
-            _ => None
+            _ => None,
         })
     }
 
@@ -135,15 +223,15 @@ impl ProofNode {
                 expr0.l.remove(i);
 
                 let mut expr1 = expr0.clone();
-                expr0.l.push(f.as_ref().clone());
-                expr1.l.push(g.as_ref().clone());
+                expr0.l.insert(i, f.as_ref().clone());
+                expr1.l.insert(i, g.as_ref().clone());
 
                 Some(Proof::new(
                     Rule::LOr,
                     vec![ProofNode::new(expr0), ProofNode::new(expr1)],
                 ))
             }
-            _ => None
+            _ => None,
         })
     }
 
@@ -154,8 +242,8 @@ impl ProofNode {
                 expr1.l.remove(i);
 
                 let mut expr2 = expr1.clone();
-                expr1.r.push(f.as_ref().clone());
-                expr2.l.push(g.as_ref().clone());
+                expr1.r.insert(0, f.as_ref().clone());
+                expr2.l.insert(i, g.as_ref().clone());
 
                 Some(Proof::new(
                     Rule::LImpl,
@@ -171,7 +259,7 @@ impl ProofNode {
             &Formula::Not(ref f) => {
                 let mut expr = self.expr.clone();
                 expr.r.remove(i);
-                expr.l.push(f.as_ref().clone());
+                expr.l.insert(0, f.as_ref().clone());
 
                 Some(Proof::new(Rule::RNot, vec![ProofNode::new(expr)]))
             }
@@ -186,15 +274,15 @@ impl ProofNode {
                 expr1.r.remove(i);
 
                 let mut expr2 = expr1.clone();
-                expr1.r.push(f.as_ref().clone());
-                expr2.r.push(g.as_ref().clone());
+                expr1.r.insert(i, f.as_ref().clone());
+                expr2.r.insert(i, g.as_ref().clone());
 
                 Some(Proof::new(
                     Rule::RAnd,
                     vec![ProofNode::new(expr1), ProofNode::new(expr2)],
                 ))
-            },
-            _ => None
+            }
+            _ => None,
         })
     }
 
@@ -203,12 +291,12 @@ impl ProofNode {
             &Formula::Or(ref f, ref g) => {
                 let mut expr = self.expr.clone();
                 expr.r.remove(i);
-                expr.r.push(f.as_ref().clone());
-                expr.r.push(g.as_ref().clone());
+                expr.r.insert(i, f.as_ref().clone());
+                expr.r.insert(i + 1, g.as_ref().clone());
 
                 Some(Proof::new(Rule::ROr, vec![ProofNode::new(expr)]))
-            },
-            _ => None
+            }
+            _ => None,
         })
     }
 
@@ -217,13 +305,21 @@ impl ProofNode {
             &Formula::Implication(ref f, ref g) => {
                 let mut expr = self.expr.clone();
                 expr.r.remove(i);
-                expr.l.push(f.as_ref().clone());
-                expr.r.push(g.as_ref().clone());
+                expr.l.insert(0, f.as_ref().clone());
+                expr.r.insert(i, g.as_ref().clone());
 
                 Some(Proof::new(Rule::RImpl, vec![ProofNode::new(expr)]))
-            },
-            _ => None
+            }
+            _ => None,
         })
+    }
+}
+
+fn center(l: usize, s: String) -> String {
+    if l > s.len() {
+        " ".repeat((l - s.len()) / 2).to_string() + &s + &" ".repeat((l - s.len() + 1) / 2)
+    } else {
+        s
     }
 }
 
@@ -240,17 +336,14 @@ mod tests {
 
     #[test]
     fn test_complex_unprovable() {
-        let (proven, _) = parse_expression(
-            " => P & Q | R & Q | -P & -R | R & -R > P | Q",
-        ).prove();
+        let (proven, _) = parse_expression(" => P & Q | R & Q | -P & -R | R & -R > P | Q").prove();
         assert!(!proven);
     }
 
     #[test]
     fn test_complex() {
-        let (proven, proof_tree) = parse_expression(
-            " => P & Q | R & Q | P & -R | R & -R > P | Q",
-        ).prove();
+        let (proven, proof_tree) =
+            parse_expression(" => P & Q | R & Q | P & -R | R & -R > P | Q").prove();
         assert!(proven);
         //Assert that proof tree is complex - 5 layers min.
         assert!(

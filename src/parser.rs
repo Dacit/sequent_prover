@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use super::prover::ProofNode;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -11,6 +13,26 @@ pub enum Formula {
     Implication(Box<Formula>, Box<Formula>),
 }
 
+impl Formula {
+    pub fn to_string(&self) -> String {
+        match self {
+            &Formula::True => String::from("1"),
+            &Formula::False => String::from("0"),
+            &Formula::Atom(ref s) => s.clone(),
+            &Formula::Not(ref f) => "-".to_string() + &f.as_ref().to_string(),
+            &Formula::And(ref f1, ref f2) => {
+                f1.as_ref().to_string() + " & " + &f2.as_ref().to_string()
+            }
+            &Formula::Or(ref f1, ref f2) => {
+                f1.as_ref().to_string() + " | " + &f2.as_ref().to_string()
+            }
+            &Formula::Implication(ref f1, ref f2) => {
+                f1.as_ref().to_string() + " > " + &f2.as_ref().to_string()
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Expression {
     pub l: Vec<Formula>,
@@ -18,6 +40,19 @@ pub struct Expression {
 }
 
 impl Expression {
+    pub fn to_string(&self) -> String {
+        self.l
+            .iter()
+            .map(Formula::to_string)
+            .fold1(|f, g| f + &", " + &g)
+            .unwrap_or("".to_string()) + &" => "
+            + &self.r
+                .iter()
+                .map(Formula::to_string)
+                .fold1(|f, g| f + &", " + &g)
+                .unwrap_or("".to_string())
+    }
+
     pub fn prove(&self) -> (bool, ProofNode) {
         let mut root = ProofNode::new(self.clone());
 

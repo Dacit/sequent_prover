@@ -4,3 +4,5 @@ version = "0.1.0"
 authors = ["Fabian Huch"]
 
 [dependencies]
+itertools = "0.7.8"
+terminal_size = "0.1.7"

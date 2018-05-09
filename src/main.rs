@@ -1,4 +1,7 @@
+extern crate itertools;
+
 use std::io;
+use std::panic::catch_unwind;
 
 mod parser;
 mod prover;
@@ -17,15 +20,20 @@ fn main() {
             break;
         }
 
-        let expr = parser::parse_expression(expression);
-        println!("Parsed expression: {:?}", expr);
+        let expr = catch_unwind(|| parser::parse_expression(expression)).ok();
 
-        let (proven, proof_tree) = expr.prove();
+        if expr.is_some() {
+            println!("Parsed expression.");
 
-        if proven {
-            println!("Statement is valid. Proof tree: {:#?}", proof_tree);
-        } else {
-            println!("Not provable. Partial proof tree: {:#?}", proof_tree);
+            let (proven, proof_tree) = expr.unwrap().prove();
+
+            if proven {
+                println!("Statement is valid.");
+                let (_, _, lines) = proof_tree.build_str();
+                lines.iter().for_each(|s| println!("{}", s));
+            } else {
+                println!("Not provable. Partial proof tree: {:#?}", proof_tree);
+            }
         }
     }
 }
