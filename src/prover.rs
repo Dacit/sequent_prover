@@ -204,13 +204,16 @@ impl ProofNode {
 
     fn l_not_rule(&mut self) -> Option<Proof> {
         ProofNode::destruct_formula(&self.expr.l, |i, f| match f {
-            &Formula::Not(ref f) => {
+            &Formula::Not(_) | &Formula::True => {
                 let mut expr = self.expr.clone();
                 expr.l.remove(i);
-                expr.r.insert(0, f.as_ref().clone());
+                expr.r.insert(0, match f {
+                    &Formula::Not(ref f) => f.as_ref().clone(),
+                    _ => Formula::False,
+                });
 
                 Some(Proof::new(Rule::LNot, vec![ProofNode::new(expr)]))
-            }
+            },
             _ => None,
         })
     }
@@ -269,10 +272,13 @@ impl ProofNode {
 
     fn r_not_rule(&mut self) -> Option<Proof> {
         ProofNode::destruct_formula(&self.expr.r, |i, f| match f {
-            &Formula::Not(ref f) => {
+            &Formula::Not(_) | &Formula::True => {
                 let mut expr = self.expr.clone();
                 expr.r.remove(i);
-                expr.l.insert(0, f.as_ref().clone());
+                expr.l.insert(0, match f {
+                    &Formula::Not(ref f) => f.as_ref().clone(),
+                    _ => Formula::False
+                });
 
                 Some(Proof::new(Rule::RNot, vec![ProofNode::new(expr)]))
             }
