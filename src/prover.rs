@@ -91,33 +91,44 @@ impl ProofNode {
                     .fold1(|s1, s2| s1 + 6 + s2)
                     .unwrap_or(0);
 
+                // middle line (and lower) have to be adapted to exactly match lower and upper line
+                let diff = |e: Option<&(usize, usize, Vec<String>)>| {
+                    e.and_then(|&(size, _, ref vec)| {
+                        vec.last().and_then(|s| {
+                            if s.len() > 6 + size {
+                                Some((s.len() - 6 - size) / 2)
+                            } else {
+                                None
+                            }
+                        })
+                    }).unwrap_or(0)
+                };
+                let (skip_before_len, skip_after_len) =
+                    (diff(upper_lines.first()), diff(upper_lines.last()));
+
                 let mid = " ".repeat((&rule).to_string().len()).to_string() + &" "
                     + &if lower.len() >= upper_len {
                         "-".repeat(lower.len()) + &" " + &rule.to_string()
                     } else {
-                        let diff = |e: Option<&(usize, usize, Vec<String>)>| {
-                            e.and_then(|&(size, _, ref vec)| {
-                                vec.last().and_then(|s| Some((s.len() - 6 - size) / 2))
-                            }).unwrap_or(0)
-                        };
-                        let (before, after) = (diff(upper_lines.first()), diff(upper_lines.last()));
-                        " ".repeat(before).to_string() + &"-".repeat(upper_len - (before + after)) + &" "
-                            + &rule.to_string() + &" ".repeat(after)
+                        " ".repeat(skip_before_len).to_string()
+                            + &"-".repeat(upper_len - (skip_before_len + skip_after_len))
+                            + &" " + &rule.to_string()
+                            + &" ".repeat(skip_after_len)
                     };
 
                 // center the lower line to sperator length
                 let lower_uncentered_len = lower.len();
-                lower = center(mid.len(), lower);
-
-                let mut joined_lines: Vec<String> = vec![];
+                lower = " ".repeat(skip_before_len).to_string()
+                    + &center(mid.len() - skip_before_len - skip_after_len, lower)
+                    + &" ".repeat(skip_after_len);
 
                 // do a pass for each output line, joining the proof_by strings
+                let mut joined_lines: Vec<String> = vec![];
                 let max_depth = upper_lines
                     .iter()
                     .map(|&(_, _, ref vec)| vec.len())
                     .max()
                     .unwrap_or(0);
-
                 for _ in 0..max_depth {
                     let line = upper_lines
                         .iter_mut()
@@ -130,11 +141,13 @@ impl ProofNode {
                     joined_lines.insert(0, center(mid.len(), line));
                 }
                 // add own lines
-
                 joined_lines.push(mid);
                 joined_lines.push(lower);
-
-                (lower_uncentered_len, cmp::max(lower_uncentered_len, upper_len), joined_lines)
+                (
+                    lower_uncentered_len,
+                    cmp::max(lower_uncentered_len, upper_len),
+                    joined_lines,
+                )
             }
             _ => (lower.len(), lower.len(), vec![lower]),
         }

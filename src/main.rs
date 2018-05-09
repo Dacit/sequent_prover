@@ -29,11 +29,11 @@ fn main() {
 
             if proven {
                 println!("Statement is valid.");
-                let (_, _, lines) = proof_tree.build_str();
-                lines.iter().for_each(|s| println!("{}", s));
             } else {
-                println!("Not provable. Partial proof tree: {:#?}", proof_tree);
+                println!("Not provable. Partial proof tree:");
             }
+            let (_, _, lines) = proof_tree.build_str();
+            lines.iter().for_each(|s| println!("{}", s));
         }
     }
 }
