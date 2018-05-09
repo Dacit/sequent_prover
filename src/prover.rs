@@ -417,7 +417,7 @@ mod tests {
                 proof_by: Some(Proof {
                     rule: Rule::LNot,
                     leaves: vec![ProofNode {
-                        expr: parse_expression("F, T => D, F"),
+                        expr: parse_expression("F, T => F, D"),
                         proof_by: Some(Proof {
                             rule: Rule::Ax,
                             leaves: vec![],
@@ -442,14 +442,14 @@ mod tests {
                     rule: Rule::LOr,
                     leaves: vec![
                         ProofNode {
-                            expr: parse_expression("T, F => F, G, D"),
+                            expr: parse_expression("F, T => F, G, D"),
                             proof_by: Some(Proof {
                                 rule: Rule::Ax,
                                 leaves: vec![],
                             }),
                         },
                         ProofNode {
-                            expr: parse_expression("T, G => F, G, D"),
+                            expr: parse_expression("G, T => F, G, D"),
                             proof_by: Some(Proof {
                                 rule: Rule::Ax,
                                 leaves: vec![],
@@ -474,7 +474,7 @@ mod tests {
                 proof_by: Some(Proof {
                     rule: Rule::LAnd,
                     leaves: vec![ProofNode {
-                        expr: parse_expression("T, F, G => F"),
+                        expr: parse_expression("F, G, T => F"),
                         proof_by: Some(Proof {
                             rule: Rule::Ax,
                             leaves: vec![],
@@ -499,14 +499,14 @@ mod tests {
                     rule: Rule::LImpl,
                     leaves: vec![
                         ProofNode {
-                            expr: parse_expression("F, T => G, D, F"),
+                            expr: parse_expression("F, T => F, G, D"),
                             proof_by: Some(Proof {
                                 rule: Rule::Ax,
                                 leaves: vec![],
                             }),
                         },
                         ProofNode {
-                            expr: parse_expression("F, T, G => G, D"),
+                            expr: parse_expression("G, F, T => G, D"),
                             proof_by: Some(Proof {
                                 rule: Rule::Ax,
                                 leaves: vec![],
@@ -531,7 +531,7 @@ mod tests {
                 proof_by: Some(Proof {
                     rule: Rule::RNot,
                     leaves: vec![ProofNode {
-                        expr: parse_expression("T, F => F, D"),
+                        expr: parse_expression("F, T => F, D"),
                         proof_by: Some(Proof {
                             rule: Rule::Ax,
                             leaves: vec![],
@@ -555,7 +555,7 @@ mod tests {
                 proof_by: Some(Proof {
                     rule: Rule::ROr,
                     leaves: vec![ProofNode {
-                        expr: parse_expression("F, T => D, F, G"),
+                        expr: parse_expression("F, T => F, G, D"),
                         proof_by: Some(Proof {
                             rule: Rule::Ax,
                             leaves: vec![],
@@ -580,14 +580,14 @@ mod tests {
                     rule: Rule::RAnd,
                     leaves: vec![
                         ProofNode {
-                            expr: parse_expression("F, G, T => D, F"),
+                            expr: parse_expression("F, G, T => F, D"),
                             proof_by: Some(Proof {
                                 rule: Rule::Ax,
                                 leaves: vec![],
                             }),
                         },
                         ProofNode {
-                            expr: parse_expression("F, G, T => D, G"),
+                            expr: parse_expression("F, G, T => G, D"),
                             proof_by: Some(Proof {
                                 rule: Rule::Ax,
                                 leaves: vec![],
@@ -612,7 +612,7 @@ mod tests {
                 proof_by: Some(Proof {
                     rule: Rule::RImpl,
                     leaves: vec![ProofNode {
-                        expr: parse_expression("G, T, F => F, D, G"),
+                        expr: parse_expression("F, G, T => G, F, D"),
                         proof_by: Some(Proof {
                             rule: Rule::Ax,
                             leaves: vec![],
